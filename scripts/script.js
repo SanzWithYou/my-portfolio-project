@@ -1,4 +1,4 @@
-// C:\xampp\htdocs\persiapan\script.js
+// C:\xampp\htdocs\persiapan\script.js (atau path proyek Anda)
 
 document.addEventListener("DOMContentLoaded", () => {
   // --- Navbar Toggle Logic (Untuk Mobile Responsif) ---
@@ -523,11 +523,17 @@ document.addEventListener("DOMContentLoaded", () => {
   const commentsDisplay = document.getElementById("commentsDisplay");
   const noCommentsYet = document.querySelector(".no-comments-yet");
 
-  const API_URL = "http://localhost:3000/api/comments";
+  // GANTI DENGAN URL Vercel ASLI Anda setelah deployment selesai!
+  // Contoh: const VERCEL_BASE_API_URL = "https://nama-unik-app-anda.vercel.app";
+  // *** INI YANG PERLU ANDA GANTI DENGAN URL VERCEL ASLI ***
+  const VERCEL_BASE_API_URL = "https://YOUR-VERCEL-APP-URL.vercel.app"; // <--- GANTI INI DENGAN URL ASLI DARI VERCEL!
+
+  const API_URL_COMMENTS = `${VERCEL_BASE_API_URL}/api/comments`;
+  const CONTACT_API_URL = `${VERCEL_BASE_API_URL}/api/contact`;
 
   async function loadComments() {
     try {
-      const response = await fetch(API_URL);
+      const response = await fetch(API_URL_COMMENTS);
       if (!response.ok) {
         throw new Error(
           `HTTP error! Status: ${response.status} - ${response.statusText}`
@@ -562,7 +568,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   async function submitCommentToServer(commentData) {
     try {
-      const response = await fetch(API_URL, {
+      const response = await fetch(API_URL_COMMENTS, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -638,8 +644,6 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // --- START NEW CODE ADDITIONS ---
-
   // --- Change Theme (Dark/Light Mode) Logic ---
   const themeToggleBtn = document.getElementById("themeToggleBtn");
   const prefersDarkScheme = window.matchMedia("(prefers-color-scheme: dark)");
@@ -687,16 +691,12 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // --- Contact Form Submission Logic (MODIFIKASI) ---
-  // Pastikan ID elemen-elemen ini sesuai di HTML Anda
+  // --- Contact Form Submission Logic ---
   const contactForm = document.getElementById("contactForm");
   const contactName = document.getElementById("contactName");
   const contactEmail = document.getElementById("contactEmail");
   const contactMessage = document.getElementById("contactMessage");
-  const contactStatusMessage = document.getElementById("contactStatusMessage"); // Elemen untuk menampilkan pesan status
-
-  // URL API untuk mengirim pesan kontak (sesuai dengan server.js yang sudah kita buat)
-  const CONTACT_API_URL = "http://localhost:3000/api/contact";
+  const contactStatusMessage = document.getElementById("contactStatusMessage");
 
   if (
     contactForm &&
@@ -706,24 +706,22 @@ document.addEventListener("DOMContentLoaded", () => {
     contactStatusMessage
   ) {
     contactForm.addEventListener("submit", async (e) => {
-      e.preventDefault(); // Mencegah form melakukan submit default (reload halaman)
+      e.preventDefault();
 
       const name = contactName.value.trim();
       const email = contactEmail.value.trim();
       const message = contactMessage.value.trim();
 
-      // Validasi sederhana di frontend
       if (!name || !email || !message) {
         contactStatusMessage.textContent = "Semua bidang harus diisi!";
         contactStatusMessage.style.color = "red";
         contactStatusMessage.style.display = "block";
-        return; // Hentikan fungsi jika ada bidang yang kosong
+        return;
       }
 
-      // Tampilkan pesan "Mengirim..." saat proses dimulai
       contactStatusMessage.textContent = "Mengirim pesan...";
       contactStatusMessage.style.color = "orange";
-      contactStatusMessage.style.display = "block"; // Pastikan pesan terlihat
+      contactStatusMessage.style.display = "block";
 
       try {
         const response = await fetch(CONTACT_API_URL, {
@@ -731,19 +729,17 @@ document.addEventListener("DOMContentLoaded", () => {
           headers: {
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({ name, email, message }), // Kirim data sebagai JSON
+          body: JSON.stringify({ name, email, message }),
         });
 
-        const result = await response.json(); // Parsing respons dari server
+        const result = await response.json();
 
         if (response.ok) {
-          // Jika respons OK (status 200-299)
           contactStatusMessage.textContent =
             result.message || "Pesan berhasil terkirim!";
           contactStatusMessage.style.color = "green";
-          contactForm.reset(); // Bersihkan form setelah berhasil
+          contactForm.reset();
         } else {
-          // Jika ada error dari server
           throw new Error(result.message || "Gagal mengirim pesan.");
         }
       } catch (error) {
@@ -751,12 +747,10 @@ document.addEventListener("DOMContentLoaded", () => {
         contactStatusMessage.textContent = `Error: ${error.message}`;
         contactStatusMessage.style.color = "red";
       } finally {
-        // Sembunyikan pesan status setelah beberapa detik, baik berhasil maupun gagal
         setTimeout(() => {
           contactStatusMessage.style.display = "none";
-        }, 5000); // Pesan akan hilang setelah 5 detik
+        }, 5000);
       }
     });
   }
-  // --- END NEW CODE ADDITIONS ---
 });
