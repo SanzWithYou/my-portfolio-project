@@ -12,10 +12,10 @@ const transporter = nodemailer.createTransport({
 
 module.exports = async (req, res) => {
   // --- Pengaturan CORS (Penting untuk menghubungkan Netlify ke Vercel) ---
-  // URL NETLIFY ANDA SUDAH DITAMBAHKAN DI SINI
+  // URL NETLIFY ANDA SUDAH DITAMBAHKAN DI SINI, TANPA TRAILING SLASH
   res.setHeader(
     "Access-Control-Allow-Origin",
-    "https://stupendous-malasada-22ce7a.netlify.app"
+    "https://stupendous-malasada-22ce7a.netlify.app" // <--- SUDAH DIKOREKSI, HILANGKAN SLASH AKHIR
   );
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");

@@ -11,12 +11,11 @@ const pool = new Pool({
 
 module.exports = async (req, res) => {
   // --- Pengaturan CORS (Penting untuk menghubungkan Netlify ke Vercel) ---
-  // GANTI 'https://YOUR-NETLIFY-SITE-URL' DENGAN URL NETLIFY ANDA YANG ASLI!
-  // Contoh: 'https://nama-portfolio-anda.netlify.app'
+  // URL NETLIFY ANDA SUDAH DITAMBAHKAN DI SINI, TANPA TRAILING SLASH
   res.setHeader(
     "Access-Control-Allow-Origin",
-    "https://stupendous-malasada-22ce7a.netlify.app/"
-  ); // <--- GANTI INI
+    "https://stupendous-malasada-22ce7a.netlify.app" // <--- SUDAH DIKOREKSI, HILANGKAN SLASH AKHIR
+  );
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 
