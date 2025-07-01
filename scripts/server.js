@@ -1,65 +1,61 @@
+// server.js
 const express = require("express");
-const bodyParser = require("body-parser");
-const cors = require("cors");
 const path = require("path");
-
-require("dotenv").config({
-  path: path.resolve(__dirname, "../.env"),
-});
-
-const mysql = require("mysql2/promise");
-const nodemailer = require("nodemailer");
+const { Pool } = require("pg"); // Ini yang BARU untuk PostgreSQL
+const nodemailer = require("nodemailer"); // Ini untuk fitur email
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3000; // Menggunakan port dinamis dari hosting atau default 3000
 
-const dbConfig = {
-  host: process.env.DB_HOST,
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-  database: process.env.DB_NAME,
-  waitForConnections: true,
-  connectionLimit: 10,
-  queueLimit: 0,
-};
+// Middleware untuk mengurai body request dalam format JSON
+app.use(express.json());
+// Jika Anda sebelumnya menggunakan 'body-parser' atau 'cors' di sini, bisa dipertahankan atau disesuaikan:
+// app.use(bodyParser.json());
+// app.use(cors());
 
-let pool;
+// --- Konfigurasi Database PostgreSQL ---
+// Menggunakan DATABASE_URL dari environment variable yang akan diset di Render
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: {
+    rejectUnauthorized: false, // Penting untuk koneksi ke layanan seperti Render Postgres
+  },
+});
 
-async function initializeDatabase() {
-  try {
-    console.log("--- DEBUGGING .env VALUES ---");
-    console.log(`DB_HOST: '${process.env.DB_HOST}'`);
-    console.log(`DB_USER: '${process.env.DB_USER}'`);
-    console.log(
-      `DB_PASSWORD: '${
-        process.env.DB_PASSWORD ? "********" : "Tidak ada password (kosong)"
-      }' (Length: ${
-        process.env.DB_PASSWORD ? process.env.DB_PASSWORD.length : 0
-      })`
-    );
-    console.log(`DB_NAME: '${process.env.DB_NAME}'`);
-    console.log(`EMAIL_USER: '${process.env.EMAIL_USER}'`);
-    console.log(
-      `EMAIL_PASS: '${
-        process.env.EMAIL_PASS ? "********" : "Tidak ada password (kosong)"
-      }'`
-    );
-    console.log(`DESTINATION_EMAIL: '${process.env.DESTINATION_EMAIL}'`);
-    console.log("-----------------------------");
-
-    pool = mysql.createPool(dbConfig);
-    console.log("Koneksi ke database MySQL berhasil dibuat!");
-    await pool.query("SELECT 1");
-    console.log("Database siap digunakan.");
-  } catch (error) {
-    console.error("Gagal terhubung ke database MySQL:", error.message);
+// Koneksi dan pengecekan tabel database saat server dimulai
+pool.connect((err, client, done) => {
+  if (err) {
+    console.error("Database connection error:", err);
+    // Tambahkan timeout sebelum keluar agar log sempat terbaca di hosting
     setTimeout(() => {
       process.exit(1);
     }, 100);
+    return;
   }
-}
-initializeDatabase();
+  console.log("Connected to PostgreSQL database!");
+  done(); // Melepaskan client kembali ke pool
+});
 
+// Membuat tabel 'comments' jika belum ada (sesuai untuk PostgreSQL)
+pool.query(
+  `
+    CREATE TABLE IF NOT EXISTS comments (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(255) NOT NULL,
+        comment_text TEXT NOT NULL,
+        timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+`,
+  (err, res) => {
+    if (err) {
+      console.error("Error creating comments table:", err);
+    } else {
+      console.log("Comments table checked/created successfully.");
+    }
+  }
+);
+
+// --- Konfigurasi Nodemailer (tetap sama seperti sebelumnya) ---
 const transporter = nodemailer.createTransport({
   service: "gmail",
   auth: {
@@ -68,22 +64,40 @@ const transporter = nodemailer.createTransport({
   },
 });
 
+// --- Middleware untuk melayani file statis (tetap sama) ---
+// path.join(__dirname, '..') akan mengarah ke folder induk dari 'scripts', yaitu root proyekmu
 app.use(express.static(path.join(__dirname, "../")));
 
-app.use(bodyParser.json());
+// Rute default untuk melayani file index.html saat ada request ke '/'
+app.get("/", (req, res) => {
+  res.sendFile(path.join(__dirname, "..", "index.html"));
+});
 
-app.use(
-  cors({
-    origin: ["http://localhost:3000", "http://127.0.0.1:3000"],
-  })
-);
+// --- Rute API untuk Komentar (Berubah query SQL-nya untuk PostgreSQL) ---
 
-let lastCommentTime = {};
+// Mengambil semua komentar dari database
+app.get("/api/comments", async (req, res) => {
+  console.log("GET /api/comments request received.");
+  try {
+    // Query SELECT untuk PostgreSQL
+    const result = await pool.query(
+      "SELECT id, name, comment_text, timestamp FROM comments ORDER BY timestamp DESC"
+    );
+    res.json(result.rows); // Untuk library 'pg', data ada di result.rows
+  } catch (error) {
+    console.error("Error fetching comments from PostgreSQL:", error);
+    res.status(500).json({
+      message: "Gagal mengambil komentar dari database.",
+    });
+  }
+});
 
+// Variabel cooldown dan filter konten (Perhatian: 'lastCommentTime' tidak akan persistent antar restart server)
+let lastCommentTime = {}; // Ini akan reset setiap server restart
 const COOLDOWN_DURATION_MS = 1 * 60 * 60 * 1000 + 30 * 60 * 1000;
-
 const EXCLUDED_IPS = ["127.0.0.1", "::1"];
 
+// Fungsi isContentClean (tetap sama)
 function isContentClean(text) {
   const normalizedText = text
     .toLowerCase()
@@ -200,21 +214,7 @@ function isContentClean(text) {
   return true;
 }
 
-app.get("/api/comments", async (req, res) => {
-  console.log("GET /api/comments request received.");
-  try {
-    const [rows] = await pool.execute(
-      "SELECT id, name, comment_text, timestamp FROM comments ORDER BY timestamp DESC"
-    );
-    res.json(rows);
-  } catch (error) {
-    console.error("Error fetching comments from MySQL:", error);
-    res.status(500).json({
-      message: "Gagal mengambil komentar dari database.",
-    });
-  }
-});
-
+// Menambah komentar baru ke database
 app.post("/api/comments", async (req, res) => {
   console.log("POST /api/comments request received:", req.body);
   const { name, text } = req.body;
@@ -263,25 +263,22 @@ app.post("/api/comments", async (req, res) => {
 
   try {
     const currentTime = new Date();
-    const [result] = await pool.execute(
-      "INSERT INTO comments (name, comment_text, timestamp) VALUES (?, ?, ?)",
+    // Query INSERT untuk PostgreSQL: menggunakan $1, $2, $3 sebagai placeholder
+    const result = await pool.query(
+      "INSERT INTO comments (name, comment_text, timestamp) VALUES ($1, $2, $3) RETURNING *",
       [name, text, currentTime]
     );
 
-    const newCommentId = result.insertId;
-    const newComment = {
-      id: newCommentId,
-      name: name,
-      comment_text: text,
-      timestamp: currentTime.toISOString(),
-    };
+    // Untuk library 'pg', data yang dikembalikan ada di result.rows[0]
+    const newComment = result.rows[0];
 
     if (!bypassCooldown) {
       lastCommentTime[clientIp] = Date.now();
     }
 
-    console.log("Komentar baru ditambahkan ke MySQL DB:", newComment);
+    console.log("Komentar baru ditambahkan ke PostgreSQL DB:", newComment);
 
+    // Pengiriman Email (tetap sama)
     if (
       process.env.EMAIL_USER &&
       process.env.EMAIL_PASS &&
@@ -292,14 +289,14 @@ app.post("/api/comments", async (req, res) => {
         to: process.env.DESTINATION_EMAIL,
         subject: "Notifikasi Komentar Baru di Portfolio Anda!",
         html: `
-                        <p>Anda mendapatkan komentar baru di situs portfolio Anda.</p>
-                        <p><strong>Nama:</strong> ${name}</p>
-                        <p><strong>Komentar:</strong></p>
-                        <p style="white-space: pre-wrap; font-style: italic;">${text}</p>
-                        <p><strong>Waktu:</strong> ${newComment.timestamp}</p>
-                        <br>
-                        <p>Ini adalah email otomatis, jangan balas.</p>
-                    `,
+                    <p>Anda mendapatkan komentar baru di situs portfolio Anda.</p>
+                    <p><strong>Nama:</strong> ${name}</p>
+                    <p><strong>Komentar:</strong></p>
+                    <p style="white-space: pre-wrap; font-style: italic;">${text}</p>
+                    <p><strong>Waktu:</strong> ${newComment.timestamp}</p>
+                    <br>
+                    <p>Ini adalah email otomatis, jangan balas.</p>
+                `,
       };
 
       transporter.sendMail(mailOptions, (error, info) => {
@@ -311,7 +308,7 @@ app.post("/api/comments", async (req, res) => {
       });
     } else {
       console.warn(
-        "Informasi pengiriman email tidak lengkap di .env. Email tidak akan dikirim."
+        "Informasi pengiriman email tidak lengkap di environment variables. Email tidak akan dikirim."
       );
     }
 
@@ -320,7 +317,7 @@ app.post("/api/comments", async (req, res) => {
       comment: newComment,
     });
   } catch (error) {
-    console.error("Error adding comment to MySQL DB:", error);
+    console.error("Error adding comment to PostgreSQL DB:", error);
     res.status(500).json({
       message: "Gagal menambahkan komentar ke database.",
     });
