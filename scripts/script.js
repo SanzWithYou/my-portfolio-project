@@ -526,7 +526,8 @@ document.addEventListener("DOMContentLoaded", () => {
   // GANTI DENGAN URL Vercel ASLI Anda setelah deployment selesai!
   // Contoh: const VERCEL_BASE_API_URL = "https://nama-unik-app-anda.vercel.app";
   // *** INI YANG PERLU ANDA GANTI DENGAN URL VERCEL ASLI ***
-  const VERCEL_BASE_API_URL = "https://YOUR-VERCEL-APP-URL.vercel.app"; // <--- GANTI INI DENGAN URL ASLI DARI VERCEL!
+  // Pastikan ada "https://" di depannya!
+  const VERCEL_BASE_API_URL = "https://sanz-web-api.vercel.app";
 
   const API_URL_COMMENTS = `${VERCEL_BASE_API_URL}/api/comments`;
   const CONTACT_API_URL = `${VERCEL_BASE_API_URL}/api/contact`;
