@@ -15,7 +15,7 @@ module.exports = async (req, res) => {
   // Contoh: 'https://nama-portfolio-anda.netlify.app'
   res.setHeader(
     "Access-Control-Allow-Origin",
-    "https://nama-portfolio-anda.netlify.app"
+    "https://stupendous-malasada-22ce7a.netlify.app/"
   ); // <--- GANTI INI
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
